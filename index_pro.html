@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>トレカ仕入れ判断ツール Pro</title>
+<style>
+:root{
+ --bg:#0b1220;--panel:#111827;--panel2:#172033;--line:#334155;--text:#f8fafc;--muted:#94a3b8;
+ --green:#22c55e;--blue:#38bdf8;--red:#ef4444;--yellow:#f59e0b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#07101f,#0f172a);color:var(--text);
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{width:min(1100px,calc(100% - 24px));margin:auto;padding:22px 0 44px}
+h1{font-size:clamp(28px,5vw,44px);margin:0 0 8px}
+h2{margin:0 0 14px}
+.sub{color:var(--muted);line-height:1.6;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{grid-column:span 12;background:rgba(17,24,39,.96);border:1px solid var(--line);
+border-radius:18px;padding:18px;box-shadow:0 14px 40px rgba(0,0,0,.18)}
+@media(min-width:800px){.half{grid-column:span 6}}
+.fields{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:640px){.two{grid-template-columns:repeat(2,1fr)}.three{grid-template-columns:repeat(3,1fr)}.four{grid-template-columns:repeat(4,1fr)}}
+label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+input,select{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#09111f;color:var(--text);font-size:16px}
+button{border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-size:15px;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}
+.primary{background:var(--green);color:#052e16}.blue{background:var(--blue);color:#082f49}
+.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.danger{background:#3d1515;color:#fecaca;border:1px solid #7f1d1d}
+.buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.status{margin-top:12px;padding:12px 14px;background:#09111f;border:1px solid var(--line);border-radius:12px;line-height:1.55}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+@media(min-width:700px){.metrics{grid-template-columns:repeat(4,1fr)}}
+.metric{background:#09111f;border:1px solid var(--line);border-radius:14px;padding:14px}
+.metric span{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.metric strong{font-size:20px}.good{color:#86efac}.bad{color:#fca5a5}.warn{color:#fcd34d}
+.badge{display:inline-block;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800}
+.badge.good{background:#12351f}.badge.warn{background:#3b2a0c}.badge.bad{background:#421717}
+.cards{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
+@media(min-width:650px){.cards{grid-template-columns:1fr 1fr}}
+.search-card{display:flex;gap:12px;background:#09111f;border:1px solid var(--line);border-radius:14px;padding:12px}
+.search-card img{width:88px;height:123px;object-fit:contain;border-radius:8px;background:#111827}
+.search-card h3{font-size:15px;margin:0 0 6px}
+.meta{font-size:12px;color:var(--muted);line-height:1.55}
+.price{font-weight:800;margin:8px 0}
+.score{font-size:38px;font-weight:900;line-height:1}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.small{font-size:12px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>トレカ仕入れ判断ツール Pro</h1>
+<div class="sub">外部相場・国内想定相場・手数料・送料・目標利益をまとめて、仕入れていい価格を判定します。</div>
+
+<div class="grid">
+<section class="card">
+<h2>① カード相場を検索</h2>
+<div class="fields three">
+ <div><label>検索言語</label><select id="lang"><option value="ja" selected>日本語</option><option value="en">英語</option></select></div>
+ <div><label>カード名</label><input id="query" placeholder="例：ピカチュウ"></div>
+ <div><label>&nbsp;</label><button id="searchBtn" class="blue" style="width:100%">APIで検索</button></div>
+</div>
+<div class="fields two" style="margin-top:12px">
+ <div><label>USD → JPY</label><input id="usdJpy" type="number" step="0.01" value="150"></div>
+ <div><label>EUR → JPY</label><input id="eurJpy" type="number" step="0.01" value="175"></div>
+</div>
+<div class="buttons"><button id="fxBtn" class="secondary">為替を自動取得</button></div>
+<div id="apiStatus" class="status">カード名を入力して検索してください。</div>
+<div id="results" class="cards"></div>
+</section>
+
+<section class="card half">
+<h2>② 国内想定相場</h2>
+<div class="fields two">
+ <div><label>海外API相場（円）</label><input id="apiMarket" type="number" placeholder="API取得で自動入力"></div>
+ <div><label>国内補正率（%）</label><input id="jpAdjust" type="number" value="100" step="1"></div>
+</div>
+<div class="fields two" style="margin-top:12px">
+ <div><label>国内想定価格（自動）</label><input id="jpEstimate" type="number" readonly></div>
+ <div><label>国内相場を手入力（任意）</label><input id="jpManual" type="number" placeholder="例：14800"></div>
+</div>
+<div class="small" style="margin-top:10px">手入力した国内相場がある場合は、そちらを優先して判定します。</div>
+</section>
+
+<section class="card half">
+<h2>③ 仕入れ条件</h2>
+<div class="fields two">
+ <div><label>仕入れ価格（円）</label><input id="buy" type="number" placeholder="10000"></div>
+ <div><label>販売価格（円）</label><input id="sell" type="number" placeholder="15000"></div>
+</div>
+<div class="fields three" style="margin-top:12px">
+ <div><label>販売手数料（%）</label><input id="fee" type="number" value="10" step="0.1"></div>
+ <div><label>送料（円）</label><input id="shipping" type="number" value="210"></div>
+ <div><label>目標利益（円）</label><input id="targetProfit" type="number" value="1000"></div>
+</div>
+<div class="fields two" style="margin-top:12px">
+ <div><label>目標利益率（%）</label><input id="targetMargin" type="number" value="10" step="0.1"></div>
+ <div><label>安全マージン（%）</label><input id="safety" type="number" value="5" step="0.1"></div>
+</div>
+<div class="buttons">
+ <button id="judgeBtn" class="primary">仕入れ判定</button>
+ <button id="saveBtn" class="secondary">履歴保存</button>
+</div>
+</section>
+
+<section class="card">
+<h2>④ 仕入れ判定</h2>
+<div class="metrics">
+ <div class="metric"><span>判定スコア</span><strong id="score" class="score">--</strong></div>
+ <div class="metric"><span>判定</span><strong id="judge">未判定</strong></div>
+ <div class="metric"><span>想定利益</span><strong id="profit">¥0</strong></div>
+ <div class="metric"><span>想定利益率</span><strong id="margin">0%</strong></div>
+ <div class="metric"><span>仕入れ上限</span><strong id="maxBuy">¥0</strong></div>
+ <div class="metric"><span>安全仕入れ上限</span><strong id="safeMaxBuy">¥0</strong></div>
+ <div class="metric"><span>相場との差</span><strong id="discount">0%</strong></div>
+ <div class="metric"><span>損益分岐売価</span><strong id="breakEven">¥0</strong></div>
+</div>
+<div id="judgeStatus" class="status">条件を入力して「仕入れ判定」を押してください。</div>
+</section>
+
+<section class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+<h2 style="margin:0">履歴</h2><button id="clearBtn" class="danger">履歴を全部削除</button>
+</div>
+<div class="table-wrap">
+<table>
+<thead><tr><th>商品</th><th>仕入</th><th>販売</th><th>利益</th><th>利益率</th><th>判定</th><th>削除</th></tr></thead>
+<tbody id="historyBody"></tbody>
+</table>
+</div>
+</section>
+</div>
+</main>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const API='https://api.tcgdex.net/v2';
+const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Math.round(Number(n)||0));
+const num=id=>{const v=parseFloat($(id).value);return Number.isFinite(v)?v:0};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+let selectedName='';
+let history=[];
+try{history=JSON.parse(localStorage.getItem('torecaProHistory')||'[]');if(!Array.isArray(history))history=[]}catch{history=[]}
+
+async function fetchJson(url,timeout=12000){
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),timeout);
+ try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}
+ finally{clearTimeout(t)}
+}
+
+async function fx(){
+ $('fxBtn').disabled=true;$('apiStatus').textContent='為替を取得中…';
+ try{
+   const [usd,eur]=await Promise.all([
+     fetchJson('https://api.frankfurter.dev/v2/rate/USD/JPY'),
+     fetchJson('https://api.frankfurter.dev/v2/rate/EUR/JPY')
+   ]);
+   if(Number(usd?.rate))$('usdJpy').value=Number(usd.rate).toFixed(2);
+   if(Number(eur?.rate))$('eurJpy').value=Number(eur.rate).toFixed(2);
+   $('apiStatus').textContent=`為替更新：1 USD ≈ ¥${$('usdJpy').value} / 1 EUR ≈ ¥${$('eurJpy').value}`;
+ }catch(e){$('apiStatus').textContent='為替取得に失敗。手入力のレートを使えます。'}
+ finally{$('fxBtn').disabled=false}
+}
+
+async function search(){
+ const q=$('query').value.trim(),lang=$('lang').value;
+ if(!q){$('apiStatus').textContent='カード名を入力してください。';return}
+ $('searchBtn').disabled=true;$('results').innerHTML='';$('apiStatus').textContent='検索中…';
+ try{
+   const cards=await fetchJson(`${API}/${encodeURIComponent(lang)}/cards?name=${encodeURIComponent(q)}&pagination:page=1&pagination:itemsPerPage=12`);
+   if(!Array.isArray(cards)||!cards.length){$('apiStatus').textContent='見つかりませんでした。';return}
+   $('apiStatus').textContent=`${cards.length}件表示`;
+   $('results').innerHTML=cards.map(c=>{
+     const img=c.image?`${c.image}/low.webp`:'';
+     return `<div class="search-card">${img?`<img src="${esc(img)}" loading="lazy" onerror="this.style.display='none'">`:''}
+     <div><h3>${esc(c.name)}</h3><div class="meta">ID: ${esc(c.id)}<br>番号: ${esc(c.localId||'-')}</div>
+     <div class="price" id="p-${esc(c.id)}">相場未取得</div>
+     <button class="secondary priceBtn" data-id="${esc(c.id)}" data-lang="${esc(lang)}">相場取得</button></div></div>`;
+   }).join('');
+ }catch(e){$('apiStatus').textContent='API検索に失敗しました。'}
+ finally{$('searchBtn').disabled=false}
+}
+
+function getPrices(pricing){
+ const vals=[];
+ const tcg=pricing?.tcgplayer;
+ if(tcg){
+   for(const [variant,d] of Object.entries(tcg)){
+     if(!d||typeof d!=='object'||['updated','unit'].includes(variant))continue;
+     for(const key of ['marketPrice','midPrice','lowPrice']){
+       const v=Number(d?.[key]); if(v>0){vals.push({source:'TCGplayer',variant,value:v,unit:tcg.unit||'USD'});break}
+     }
+   }
+ }
+ const cm=pricing?.cardmarket;
+ if(cm){
+   for(const key of ['trend','avg7','avg30','avg','low']){
+     const v=Number(cm?.[key]);if(v>0){vals.push({source:'Cardmarket',variant:key,value:v,unit:cm.unit||'EUR'});break}
+   }
+ }
+ return vals;
+}
+function jpyPrice(p){
+ if(p.unit==='USD')return p.value*num('usdJpy');
+ if(p.unit==='EUR')return p.value*num('eurJpy');
+ if(p.unit==='JPY')return p.value;
+ return null;
+}
+async function loadPrice(btn){
+ btn.disabled=true;const id=btn.dataset.id,lang=btn.dataset.lang,out=document.getElementById('p-'+id);out.textContent='取得中…';
+ try{
+   const c=await fetchJson(`${API}/${lang}/cards/${id}`);
+   const arr=getPrices(c?.pricing).map(p=>({...p,jpy:jpyPrice(p)})).filter(p=>p.jpy>0);
+   if(!arr.length){out.textContent='価格データなし';btn.disabled=false;return}
+   arr.sort((a,b)=>a.jpy-b.jpy);
+   const avg=arr.reduce((s,x)=>s+x.jpy,0)/arr.length;
+   out.innerHTML=`平均 ${yen(avg)}<br><span class="meta">最安 ${yen(arr[0].jpy)} / ${arr.length}系統</span>`;
+   btn.textContent='この相場を使う';btn.dataset.mode='apply';btn.dataset.jpy=Math.round(avg);btn.dataset.name=c?.name||id;btn.disabled=false;
+ }catch(e){out.textContent='取得エラー';btn.disabled=false}
+}
+function updateEstimate(){
+ const api=num('apiMarket'),adj=num('jpAdjust')/100;
+ $('jpEstimate').value=api>0?Math.round(api*adj):'';
+}
+function marketPrice(){
+ const manual=num('jpManual');if(manual>0)return manual;
+ const est=num('jpEstimate');if(est>0)return est;
+ return num('sell');
+}
+function judge(){
+ const buy=num('buy'),sell=num('sell')||marketPrice(),fee=num('fee')/100,ship=num('shipping');
+ const targetProfit=num('targetProfit'),targetMargin=num('targetMargin')/100,safety=num('safety')/100;
+ if(sell<=0){$('judgeStatus').textContent='販売価格または国内相場を入力してください。';return null}
+ const feeAmt=sell*fee,profit=sell-feeAmt-ship-buy,margin=profit/sell*100;
+ const net=1-fee,breakEven=net>0?(buy+ship)/net:0;
+ const max1=sell-feeAmt-ship-targetProfit;
+ const max2=sell-feeAmt-ship-(sell*targetMargin);
+ const maxBuy=Math.max(0,Math.min(max1,max2));
+ const safeMax=Math.max(0,maxBuy*(1-safety));
+ const mkt=marketPrice()||sell;
+ const discount=mkt>0?(mkt-buy)/mkt*100:0;
+
+ let score=50;
+ score += Math.max(-25,Math.min(25,discount*0.8));
+ score += Math.max(-20,Math.min(20,(margin-targetMargin*100)*0.7));
+ if(profit>=targetProfit)score+=10;else score-=10;
+ if(buy<=safeMax)score+=15;else if(buy>maxBuy)score-=20;
+ score=Math.max(0,Math.min(100,Math.round(score)));
+
+ let label,cls;
+ if(score>=80){label='かなり良い仕入れ';cls='good'}
+ else if(score>=65){label='仕入れ候補';cls='good'}
+ else if(score>=50){label='慎重に検討';cls='warn'}
+ else{label='見送り推奨';cls='bad'}
+
+ $('score').textContent=score;$('score').className='score '+cls;
+ $('judge').innerHTML=`<span class="badge ${cls}">${label}</span>`;
+ $('profit').textContent=yen(profit);$('profit').className=profit>=0?'good':'bad';
+ $('margin').textContent=margin.toFixed(1)+'%';$('margin').className=margin>=targetMargin*100?'good':'bad';
+ $('maxBuy').textContent=yen(maxBuy);$('safeMaxBuy').textContent=yen(safeMax);
+ $('discount').textContent=discount.toFixed(1)+'%';$('breakEven').textContent=yen(breakEven);
+ $('sell').value=Math.round(sell);
+
+ const reasons=[];
+ reasons.push(profit>=targetProfit?`目標利益 ${yen(targetProfit)} をクリア`:`目標利益まで ${yen(targetProfit-profit)} 不足`);
+ reasons.push(margin>=targetMargin*100?`目標利益率をクリア`:`利益率が目標未満`);
+ reasons.push(buy<=safeMax?`安全仕入れ上限以内`:(buy<=maxBuy?`通常上限以内だが安全マージン外`:`仕入れ上限オーバー`));
+ reasons.push(`相場比 ${discount>=0?'約'+discount.toFixed(1)+'%安':'約'+Math.abs(discount).toFixed(1)+'%高'}`);
+ $('judgeStatus').innerHTML=`<b>${label}</b><br>${reasons.join(' / ')}`;
+
+ return {id:Date.now(),name:selectedName||$('query').value.trim()||'名称未設定',buy,sell,profit,margin,label,score};
+}
+function save(){
+ const r=judge();if(!r)return;
+ history.unshift(r);history=history.slice(0,200);
+ localStorage.setItem('torecaProHistory',JSON.stringify(history));render();
+}
+function render(){
+ const b=$('historyBody');b.innerHTML='';
+ if(!history.length){b.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">履歴はまだありません</td></tr>';return}
+ for(const x of history){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${esc(x.name)}</td><td>${yen(x.buy)}</td><td>${yen(x.sell)}</td><td>${yen(x.profit)}</td><td>${Number(x.margin).toFixed(1)}%</td><td>${esc(x.label)}</td><td><button class="secondary" data-del="${x.id}" style="padding:7px 10px">削除</button></td>`;
+  b.appendChild(tr)
+ }
+}
+$('fxBtn').addEventListener('click',fx);
+$('searchBtn').addEventListener('click',search);
+$('query').addEventListener('keydown',e=>{if(e.key==='Enter')search()});
+$('results').addEventListener('click',e=>{
+ const btn=e.target.closest('.priceBtn');if(!btn)return;
+ if(btn.dataset.mode==='apply'){
+   $('apiMarket').value=btn.dataset.jpy;selectedName=btn.dataset.name||'';
+   updateEstimate();
+   const m=marketPrice();if(m>0)$('sell').value=Math.round(m);
+   $('apiStatus').textContent='相場を仕入れ判定に反映しました。';
+ }else loadPrice(btn)
+});
+['apiMarket','jpAdjust'].forEach(id=>$(id).addEventListener('input',updateEstimate));
+$('jpManual').addEventListener('input',()=>{const m=marketPrice();if(m>0)$('sell').value=Math.round(m)});
+$('judgeBtn').addEventListener('click',judge);
+$('saveBtn').addEventListener('click',save);
+$('clearBtn').addEventListener('click',()=>{
+ if(!confirm('履歴を全部削除しますか？'))return;
+ history=[];localStorage.removeItem('torecaProHistory');render();
+});
+$('historyBody').addEventListener('click',e=>{
+ const btn=e.target.closest('[data-del]');if(!btn)return;
+ history=history.filter(x=>Number(x.id)!==Number(btn.dataset.del));
+ localStorage.setItem('torecaProHistory',JSON.stringify(history));render();
+});
+render();
+})();
+</script>
+</body>
+</html>
